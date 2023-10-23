@@ -1,3 +1,3 @@
 # api
 
-### Using Deepgram
+Using Deepgram

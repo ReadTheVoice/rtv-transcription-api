@@ -10,8 +10,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# token=...&meetingId=...
+
 # @app.on_event("startup")
 # async def startup_event():
-
 
 # app.include_router()
