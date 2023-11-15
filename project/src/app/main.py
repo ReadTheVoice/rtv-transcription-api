@@ -50,9 +50,6 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_bytes()
             deepgram_socket.send(data)
-            print("********************************************************************")
-            print(data)
-            print("********************************************************************")
     except Exception as e:
         raise Exception(f'Could not process audio: {e}')
     finally:
@@ -65,16 +62,8 @@ async def process_audio(fast_socket: WebSocket):
         if 'channel' in data:
             transcript = data['channel']['alternatives'][0]['transcript']
 
-            print("********************************************************************")
-            print(transcript)
-            print("********************************************************************")
-
             if transcript:
                 await fast_socket.send_text(transcript)
-
-        print("********************************************************************")
-        print(data)
-        print("********************************************************************")
 
     deepgram_socket = await connect_to_deepgram(get_transcript)
 
@@ -84,7 +73,7 @@ async def process_audio(fast_socket: WebSocket):
 # Connect to Deepgram.
 async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None]):
     try:
-        socket = await dg_client.transcription.live({'punctuate': True, 'interim_results': False})
+        socket = await deepgram_client.transcription.live({'punctuate': True, 'interim_results': False})
         socket.registerHandler(socket.event.CLOSE, lambda c: print(f'Connection closed with code {c}.'))
         socket.registerHandler(socket.event.TRANSCRIPT_RECEIVED, transcript_received_handler)
 
