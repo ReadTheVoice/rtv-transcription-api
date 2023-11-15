@@ -8,4 +8,5 @@ pytest==7.4.2
 pytest-asyncio==0.21.1
 SQLAlchemy==2.0.22
 numpy==1.26.0
+deepgram-sdk==2.12.0
 
