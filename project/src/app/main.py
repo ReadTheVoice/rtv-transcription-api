@@ -21,6 +21,18 @@ deepgram_client = Deepgram(os.getenv('DEEPGRAM_API_KEY'))
 
 favicon_path = 'project/src/app/static/img/favicon.ico'
 
+# Feel free to modify your model's parameters as you wish!
+# {'punctuate': True, 'interim_results': False, 'language': 'en-US', 'model': 'nova-2'}
+# Instead of "nova-2 "as model, we chose "enhanced" (which allowed us to stream in French)
+deepgram_options = {
+    'punctuate': True,
+    'interim_results': True,
+    # 'interim_results': False,
+    'language': 'fr',
+    'model': 'enhanced',
+}
+
+
 # token=...&meetingId=...
 
 # @app.on_event("startup")
@@ -62,6 +74,10 @@ async def process_audio(fast_socket: WebSocket):
         if 'channel' in data:
             transcript = data['channel']['alternatives'][0]['transcript']
 
+            print("**********************************************************************")
+            print(data["start"])
+            print("**********************************************************************")
+
             if transcript:
                 await fast_socket.send_text(transcript)
 
@@ -73,14 +89,12 @@ async def process_audio(fast_socket: WebSocket):
 # Connect to Deepgram.
 async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None]):
     try:
-        socket = await deepgram_client.transcription.live({'punctuate': True, 'interim_results': False})
+        # socket = await deepgram_client.transcription.live({'punctuate': True, 'interim_results': False})
+        socket = await deepgram_client.transcription.live(deepgram_options)
+
         socket.registerHandler(socket.event.CLOSE, lambda c: print(f'Connection closed with code {c}.'))
         socket.registerHandler(socket.event.TRANSCRIPT_RECEIVED, transcript_received_handler)
 
         return socket
     except Exception as e:
         raise Exception(f'Could not open socket: {e}')
-
-
-
-

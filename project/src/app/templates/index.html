@@ -20,9 +20,11 @@
             <!-- Receive and obtain data with the below events -->
             socket.onopen = () => {
                 document.querySelector('#status').textContent = 'Connected'
+
                 console.log({
                     event: 'onopen'
                 })
+
                 mediaRecorder.addEventListener('dataavailable', async (event) => {
                     if (event.data.size > 0 && socket.readyState == 1) {
                         socket.send(event.data)
@@ -32,6 +34,10 @@
             }
 
             socket.onmessage = (message) => {
+                console.log({
+                    event: 'onmessage'
+                })
+
                 const received = message.data
                 if (received) {
                     console.log(received)
