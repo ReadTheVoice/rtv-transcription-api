@@ -1,6 +1,8 @@
 import os
+
+import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from deepgram import Deepgram
@@ -19,7 +21,11 @@ templates = Jinja2Templates(directory="project/src/app/templates")
 
 deepgram_client = Deepgram(os.getenv('DEEPGRAM_API_KEY'))
 
+jwt_authorization = os.getenv('JWT_AUTHORIZATION')
+
 favicon_path = 'project/src/app/static/img/favicon.ico'
+styles_file_path = 'project/src/app/templates/css/styles.css'
+js_file_path = 'project/src/app/templates/js/utils.js'
 
 # Feel free to modify your model's parameters as you wish!
 # {'punctuate': True, 'interim_results': False, 'language': 'en-US', 'model': 'nova-2'}
@@ -46,14 +52,55 @@ async def get_favicon():
     return FileResponse(favicon_path)
 
 
+@app.get("/css/styles.css", include_in_schema=False)
+async def get_styles_file():
+    return FileResponse(styles_file_path)
+
+
+@app.get("/js/utils.js", include_in_schema=False)
+async def get_js_file():
+    return FileResponse(js_file_path)
+
+
 @app.get("/", response_class=HTMLResponse)
 def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("/listen-to-meeting")
-def listen_to_meeting():
-    return ""
+@app.get("/verify_token")
+async def is_token_valid(token: str):
+    # https://verifytoken-vpiwklolaa-ey.a.run.app/
+    try:
+        url = "https://verifytoken-vpiwklolaa-ey.a.run.app/"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url=url,
+                params={
+                    "token": token
+                },
+                headers={
+                    "Authorization": jwt_authorization
+                }
+            )
+
+        if response.status_code == 200:
+
+            print("response")
+            print(response)
+
+            # return {"data_from_external_url": response.json()}
+            return True
+        else:
+            raise HTTPException(status_code=response.status_code, detail="External URL request failed")
+
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail=f"HTTP request error: {str(e)}")
+
+
+@app.get("/transcribe", response_class=HTMLResponse)
+def get(request: Request):  # , user_id: str, meeting_id: str):
+    # https://verifytoken-vpiwklolaa-ey.a.run.app/
+    return templates.TemplateResponse("transcription.html", {"request": request})
 
 
 # Websocket Connection Between Server and Browser
