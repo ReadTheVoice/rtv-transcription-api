@@ -51,6 +51,11 @@ def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/listen-to-meeting")
+def listen_to_meeting():
+    return ""
+
+
 # Websocket Connection Between Server and Browser
 @app.websocket("/listen")
 async def websocket_endpoint(websocket: WebSocket):
