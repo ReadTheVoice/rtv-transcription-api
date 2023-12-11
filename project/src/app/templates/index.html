@@ -6,58 +6,63 @@
 </head>
 <body>
     <h1>Transcribe Audio With FastAPI</h1>
+
+    <button>
+<!--    Try to verify user and then     -->
+    </button>
+
     <p id="status">Connection status will go here</p>
 <!--    <p id="transcript">Deepgram transcript will go here</p>-->
     <p id="transcript">Deepgram transcript: </p>
 
-    <script>
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-            const mediaRecorder = new MediaRecorder(stream)
+<!--    <script>-->
+<!--        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {-->
+<!--            const mediaRecorder = new MediaRecorder(stream)-->
 
-            <!-- Websocket Connection Between Server and Browser-->
-            const socket = new WebSocket('ws://localhost:8000/listen')
+<!--            &lt;!&ndash; Websocket Connection Between Server and Browser&ndash;&gt;-->
+<!--            const socket = new WebSocket('ws://localhost:8000/listen')-->
 
-            <!-- Receive and obtain data with the below events -->
-            socket.onopen = () => {
-                document.querySelector('#status').textContent = 'Connected'
+<!--            &lt;!&ndash; Receive and obtain data with the below events &ndash;&gt;-->
+<!--            socket.onopen = () => {-->
+<!--                document.querySelector('#status').textContent = 'Connected'-->
 
-                console.log({
-                    event: 'onopen'
-                })
+<!--                console.log({-->
+<!--                    event: 'onopen'-->
+<!--                })-->
 
-                mediaRecorder.addEventListener('dataavailable', async (event) => {
-                    if (event.data.size > 0 && socket.readyState == 1) {
-                        socket.send(event.data)
-                    }
-                })
-                mediaRecorder.start(250)
-            }
+<!--                mediaRecorder.addEventListener('dataavailable', async (event) => {-->
+<!--                    if (event.data.size > 0 && socket.readyState == 1) {-->
+<!--                        socket.send(event.data)-->
+<!--                    }-->
+<!--                })-->
+<!--                mediaRecorder.start(250)-->
+<!--            }-->
 
-            socket.onmessage = (message) => {
-                console.log({
-                    event: 'onmessage'
-                })
+<!--            socket.onmessage = (message) => {-->
+<!--                console.log({-->
+<!--                    event: 'onmessage'-->
+<!--                })-->
 
-                const received = message.data
-                if (received) {
-                    console.log(received)
-                    document.querySelector('#transcript').textContent += ' ' + received
-                }
-            }
+<!--                const received = message.data-->
+<!--                if (received) {-->
+<!--                    console.log(received)-->
+<!--                    document.querySelector('#transcript').textContent += ' ' + received-->
+<!--                }-->
+<!--            }-->
 
-            socket.onclose = () => {
-                console.log({
-                    event: 'onclose'
-                })
-            }
+<!--            socket.onclose = () => {-->
+<!--                console.log({-->
+<!--                    event: 'onclose'-->
+<!--                })-->
+<!--            }-->
 
-            socket.onerror = (error) => {
-                console.log({
-                    event: 'onerror',
-                    error
-                })
-            }
-        })
-    </script>
+<!--            socket.onerror = (error) => {-->
+<!--                console.log({-->
+<!--                    event: 'onerror',-->
+<!--                    error-->
+<!--                })-->
+<!--            }-->
+<!--        })-->
+<!--    </script>-->
 </body>
 </html>
