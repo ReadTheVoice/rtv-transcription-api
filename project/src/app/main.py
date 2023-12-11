@@ -8,6 +8,8 @@ from fastapi.templating import Jinja2Templates
 from deepgram import Deepgram
 from typing import Dict, Callable
 
+from starlette.middleware.cors import CORSMiddleware
+
 load_dotenv()
 
 # Deepgram
@@ -15,6 +17,16 @@ app = FastAPI(
     title="Live transcription with Deepgram API management",
     description="ReadTheVoice API for managing speech-to-text functionality",
     version="1.0.0"
+)
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 templates = Jinja2Templates(directory="project/src/app/templates")
@@ -69,36 +81,28 @@ def get(request: Request):
 
 @app.get("/verify_token")
 async def is_token_valid(token: str):
-    # https://verifytoken-vpiwklolaa-ey.a.run.app/
     try:
         url = "https://verifytoken-vpiwklolaa-ey.a.run.app/"
         async with httpx.AsyncClient() as client:
-            response = await client.get(
+            # // Access-Control-Allow-Origin
+
+            response = await client.post(
                 url=url,
-                # params={
-                #     "token": token
-                # },
                 headers={
-                    "Authorization": jwt_authorization
+                    "Authorization": jwt_authorization,
+                    "Content-Type": "application/json",
                 },
+                json={
+                    "token": token
+                }
             )
 
-            # response = await client.post(
-            #     url=url,
-            #     headers={
-            #         "Authorization": jwt_authorization,
-            #         "Content-Type": "application/json",
-            #     },
-            #     json={
-            #         "token": token
-            #     }
-            # )
-
         if response.status_code == 200:
-            print("response")
-            print(response)
+            print("response.json()")
+            print(response.json())
 
-            return {"data_from_external_url": response.json()}
+            return response.json()
+            # return {"data": response.json()}
             # return True
         else:
             raise HTTPException(status_code=response.status_code, detail="External URL request failed")
@@ -109,13 +113,12 @@ async def is_token_valid(token: str):
 
 @app.get("/transcribe", response_class=HTMLResponse)
 def get(request: Request):  # , user_id: str, meeting_id: str):
-    # https://verifytoken-vpiwklolaa-ey.a.run.app/
     return templates.TemplateResponse("transcription.html", {"request": request})
 
 
 # Websocket Connection Between Server and Browser
 @app.websocket("/listen")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket):  # Must pass the meetingId argument
     await websocket.accept()
 
     try:

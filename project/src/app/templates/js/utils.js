@@ -1,7 +1,3 @@
-//// get token
-////async function callApi(token: String) {
-//
-
 async function callApi() {
     try {
         let token = ""
@@ -9,7 +5,7 @@ async function callApi() {
 
         // Query parameters
         const queryParams = {
-            token: token,
+            "token": token,
         };
 
         // Constructing the URL with query parameters
@@ -21,10 +17,10 @@ async function callApi() {
         console.log("token: ")
         console.log(token)
 
-        console.log("response: ")
-        console.log(response)
+        const data = await response.json();
+        console.log('Response content:', data);
 
-        if (response.ok) {
+        if (response.ok && data["email"] != "") {
             // Token is correct, navigate to the desired page
             window.location.href = 'http://localhost:8000/transcribe';
         } else {
