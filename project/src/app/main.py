@@ -75,21 +75,31 @@ async def is_token_valid(token: str):
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 url=url,
-                params={
-                    "token": token
-                },
+                # params={
+                #     "token": token
+                # },
                 headers={
                     "Authorization": jwt_authorization
-                }
+                },
             )
 
-        if response.status_code == 200:
+            # response = await client.post(
+            #     url=url,
+            #     headers={
+            #         "Authorization": jwt_authorization,
+            #         "Content-Type": "application/json",
+            #     },
+            #     json={
+            #         "token": token
+            #     }
+            # )
 
+        if response.status_code == 200:
             print("response")
             print(response)
 
-            # return {"data_from_external_url": response.json()}
-            return True
+            return {"data_from_external_url": response.json()}
+            # return True
         else:
             raise HTTPException(status_code=response.status_code, detail="External URL request failed")
 
