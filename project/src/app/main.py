@@ -1,13 +1,17 @@
 import os
 
 import httpx
-import pyrebase
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from deepgram import Deepgram
 from typing import Dict, Callable
+# from firebase import firebase as fire
+import firebase.firebase as fire
+
+import firebase_admin
+from firebase_admin import credentials
 
 from starlette.middleware.cors import CORSMiddleware
 
@@ -56,14 +60,17 @@ firebase_api_key = os.getenv('API_KEY')
 firebase_auth_domain = os.getenv('AUTH_DOMAIN')
 firebase_db_url = os.getenv('DATABASE_URL')
 
+cred = credentials.Certificate("path/to/serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
+
 config = {
   "apiKey": firebase_api_key,
   "authDomain": firebase_auth_domain,
   "databaseURL": firebase_db_url
 }
 
-firebase = pyrebase.initialize_app(config)
-db = firebase.database()
+# firebase = pyrebase.initialize_app(config)
+# db = firebase.database()
 
 # config = {
 #   "apiKey": "apiKey",
@@ -164,33 +171,40 @@ async def process_audio(fast_socket: WebSocket):
             start_time = data["start"]
             print(start_time)
 
-            fb_data = {
-                "meeting_id": "uuid",
-                "user_id": "uuid",
-                "start": start_time,
-                "data": transcript
-            }
-
-            current_transcript = db.child("transcript").order_by_child("meeting_id").equal_to("uuid").get()
-            tp_val = current_transcript.val()
-            if tp_val is None:
-                # create one
-                db.child("transcript").push(fb_data)
-            else:
-                tp = tp_val.get("data")
-                print("tp")
-                print(tp)
-
-                new_value = tp + transcript
-                print("new_value")
-                print(new_value)
-                # update it
-                # db.child("transcript").order_by_child("meeting_id").equal_to("uuid").update({"data": new_value})
-                current_transcript.val().update({"data": new_value})
+            # fb_data = {
+            #     "meeting_id": "uuid",
+            #     "user_id": "uuid",
+            #     "start": start_time,
+            #     "data": transcript
+            # }
+            #
+            # current_transcript = db.child("transcript").order_by_child("meeting_id").equal_to("uuid").get()
+            # tp_val = current_transcript.val()
+            # if tp_val is None:
+            #     # create one
+            #     db.child("transcript").push(fb_data)
+            # else:
+            #     tp = tp_val.get("data")
+            #     print("tp")
+            #     print(tp)
+            #
+            #     new_value = tp + transcript
+            #     print("new_value")
+            #     print(new_value)
+            #     # pip install urllib3
+            #     # update it
+            #     # db.child("transcript").order_by_child("meeting_id").equal_to("uuid").update({"data": new_value})
+            #     current_transcript.val().update({"data": new_value})
 
             # db.child("users").push(data)  # create with auto generated id
             # db.child("transcript").child("Morty").set(fb_data)  # create with id = morty
             # db.child("users").child("Morty").update({"data": "Mortiest Morty"})
+
+            fb = fire.FirebaseApplication(firebase_db_url, None)
+            result = fb.get('/users', '1')
+            print("fb result")
+            print(result)
+            # {'1': 'John Doe'}
 
             print("**********************************************************************")
 
