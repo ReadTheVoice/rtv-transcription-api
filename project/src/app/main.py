@@ -1,4 +1,5 @@
 import os
+import uuid
 
 import httpx
 from dotenv import load_dotenv
@@ -11,7 +12,7 @@ from typing import Dict, Callable
 import firebase.firebase as fire
 
 import firebase_admin
-from firebase_admin import credentials
+from firebase_admin import credentials, db
 
 from starlette.middleware.cors import CORSMiddleware
 
@@ -49,35 +50,21 @@ js_file_path = 'project/src/app/templates/js/utils.js'
 # Instead of "nova-2 "as model, we chose "enhanced" (which allowed us to stream in French)
 deepgram_options = {
     'punctuate': True,
-    'interim_results': True,
-    # 'interim_results': False,
+    # 'interim_results': True,
+    'interim_results': False,
     'language': 'fr',
     'model': 'enhanced',
 }
 
 # Database config
-firebase_api_key = os.getenv('API_KEY')
-firebase_auth_domain = os.getenv('AUTH_DOMAIN')
 firebase_db_url = os.getenv('DATABASE_URL')
+credentials_file_path = os.getenv('CREDENTIALS_FILE_PATH')
 
-cred = credentials.Certificate("path/to/serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-
-config = {
-  "apiKey": firebase_api_key,
-  "authDomain": firebase_auth_domain,
-  "databaseURL": firebase_db_url
-}
-
-# firebase = pyrebase.initialize_app(config)
-# db = firebase.database()
-
-# config = {
-#   "apiKey": "apiKey",
-#   "authDomain": "projectId.firebaseapp.com",
-#   "databaseURL": "https://databaseName.firebaseio.com",
-#   "storageBucket": "projectId.appspot.com"
-# }
+# /project/credentials/moonlight-sharonn-firebase-adminsdk-fzc3n-e47c86335b.json
+# cred = credentials.Certificate("project/credentials/moonlight-sharonn-firebase-adminsdk-fzc3n-e47c86335b.json")
+cred = credentials.Certificate(credentials_file_path)
+firebase_admin.initialize_app(cred, {'databaseURL': firebase_db_url})
+root_ref = db.reference()
 
 # token=...&meetingId=...
 
@@ -171,40 +158,44 @@ async def process_audio(fast_socket: WebSocket):
             start_time = data["start"]
             print(start_time)
 
-            # fb_data = {
-            #     "meeting_id": "uuid",
-            #     "user_id": "uuid",
-            #     "start": start_time,
-            #     "data": transcript
-            # }
-            #
-            # current_transcript = db.child("transcript").order_by_child("meeting_id").equal_to("uuid").get()
-            # tp_val = current_transcript.val()
-            # if tp_val is None:
-            #     # create one
-            #     db.child("transcript").push(fb_data)
-            # else:
-            #     tp = tp_val.get("data")
-            #     print("tp")
-            #     print(tp)
-            #
-            #     new_value = tp + transcript
-            #     print("new_value")
-            #     print(new_value)
-            #     # pip install urllib3
-            #     # update it
-            #     # db.child("transcript").order_by_child("meeting_id").equal_to("uuid").update({"data": new_value})
-            #     current_transcript.val().update({"data": new_value})
+            fb_data = {
+                "meeting_id": "uuid",
+                "user_id": "uuid",
+                "start": start_time,
+                "data": transcript
+            }
 
-            # db.child("users").push(data)  # create with auto generated id
-            # db.child("transcript").child("Morty").set(fb_data)  # create with id = morty
-            # db.child("users").child("Morty").update({"data": "Mortiest Morty"})
+            users_ref = root_ref.child('transcript')
+            snapshot = users_ref.get()
 
-            fb = fire.FirebaseApplication(firebase_db_url, None)
-            result = fb.get('/users', '1')
-            print("fb result")
-            print(result)
-            # {'1': 'John Doe'}
+            if snapshot:
+                test = users_ref.order_by_child("meeting_id").equal_to("uuid").get()
+                if test:
+                    ky = test
+                    # OrderedDict([('-NnjqZx3Tz52UXo5MJ1f', {'data': '', 'meeting_id': 'uuid', 'start': 0.0, 'user_id': 'uuid'})])
+                    for key, values in ky.items():
+                        print(key)
+                        print(values)
+                        dt = values["data"]
+                        st = values["start"]
+
+                        if st != start_time:
+                            dt += "."
+
+                        dt += transcript
+                        updated_data = {
+                            'data': dt,
+                            "start": start_time
+                        }
+                        users_ref.child(f"{key}").update(updated_data)
+            else:
+                users_ref.push(fb_data)
+
+            # fb = fire.FirebaseApplication(firebase_db_url, None)
+            # result = fb.get('/users', '1')
+            # print("fb result")
+            # print(result)
+            # # {'1': 'John Doe'}
 
             print("**********************************************************************")
 
