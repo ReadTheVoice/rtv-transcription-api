@@ -172,12 +172,21 @@ async def process_audio(fast_socket: WebSocket):
             }
 
             current_transcript = db.child("transcript").order_by_child("meeting_id").equal_to("uuid").get()
-            if current_transcript.val() is None:
+            tp_val = current_transcript.val()
+            if tp_val is None:
                 # create one
-                db.child("transcript").push(data)
+                db.child("transcript").push(fb_data)
             else:
+                tp = tp_val.get("data")
+                print("tp")
+                print(tp)
+
+                new_value = tp + transcript
+                print("new_value")
+                print(new_value)
                 # update it
-                db.child("users").child("Morty").update({"data": "Mortiest Morty"})
+                # db.child("transcript").order_by_child("meeting_id").equal_to("uuid").update({"data": new_value})
+                current_transcript.val().update({"data": new_value})
 
             # db.child("users").push(data)  # create with auto generated id
             # db.child("transcript").child("Morty").set(fb_data)  # create with id = morty
