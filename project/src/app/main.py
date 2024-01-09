@@ -1,6 +1,7 @@
 import os
 
 import httpx
+import pyrebase
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
@@ -50,6 +51,26 @@ deepgram_options = {
     'model': 'enhanced',
 }
 
+# Database config
+firebase_api_key = os.getenv('API_KEY')
+firebase_auth_domain = os.getenv('AUTH_DOMAIN')
+firebase_db_url = os.getenv('DATABASE_URL')
+
+config = {
+  "apiKey": firebase_api_key,
+  "authDomain": firebase_auth_domain,
+  "databaseURL": firebase_db_url
+}
+
+firebase = pyrebase.initialize_app(config)
+db = firebase.database()
+
+# config = {
+#   "apiKey": "apiKey",
+#   "authDomain": "projectId.firebaseapp.com",
+#   "databaseURL": "https://databaseName.firebaseio.com",
+#   "storageBucket": "projectId.appspot.com"
+# }
 
 # token=...&meetingId=...
 
@@ -140,7 +161,28 @@ async def process_audio(fast_socket: WebSocket):
             transcript = data['channel']['alternatives'][0]['transcript']
 
             print("**********************************************************************")
-            print(data["start"])
+            start_time = data["start"]
+            print(start_time)
+
+            fb_data = {
+                "meeting_id": "uuid",
+                "user_id": "uuid",
+                "start": start_time,
+                "data": transcript
+            }
+
+            current_transcript = db.child("transcript").order_by_child("meeting_id").equal_to("uuid").get()
+            if current_transcript.val() is None:
+                # create one
+                db.child("transcript").push(data)
+            else:
+                # update it
+                db.child("users").child("Morty").update({"data": "Mortiest Morty"})
+
+            # db.child("users").push(data)  # create with auto generated id
+            # db.child("transcript").child("Morty").set(fb_data)  # create with id = morty
+            # db.child("users").child("Morty").update({"data": "Mortiest Morty"})
+
             print("**********************************************************************")
 
             if transcript:
