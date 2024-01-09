@@ -180,7 +180,7 @@ async def process_audio(fast_socket: WebSocket):
                         st = values["start"]
 
                         if st != start_time:
-                            dt += "."
+                            dt += ". "
 
                         dt += transcript
                         updated_data = {
