@@ -1,6 +1,4 @@
 import os
-import uuid
-
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket, HTTPException
@@ -8,8 +6,6 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from deepgram import Deepgram
 from typing import Dict, Callable
-# from firebase import firebase as fire
-import firebase.firebase as fire
 
 import firebase_admin
 from firebase_admin import credentials, db
@@ -59,9 +55,6 @@ deepgram_options = {
 # Database config
 firebase_db_url = os.getenv('DATABASE_URL')
 credentials_file_path = os.getenv('CREDENTIALS_FILE_PATH')
-
-# /project/credentials/moonlight-sharonn-firebase-adminsdk-fzc3n-e47c86335b.json
-# cred = credentials.Certificate("project/credentials/moonlight-sharonn-firebase-adminsdk-fzc3n-e47c86335b.json")
 cred = credentials.Certificate(credentials_file_path)
 firebase_admin.initialize_app(cred, {'databaseURL': firebase_db_url})
 root_ref = db.reference()
@@ -70,8 +63,6 @@ root_ref = db.reference()
 
 # @app.on_event("startup")
 # async def startup_event():
-
-# app.include_router()
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -99,8 +90,6 @@ async def is_token_valid(token: str):
     try:
         url = "https://verifytoken-vpiwklolaa-ey.a.run.app/"
         async with httpx.AsyncClient() as client:
-            # // Access-Control-Allow-Origin
-
             response = await client.post(
                 url=url,
                 headers={
@@ -156,7 +145,6 @@ async def process_audio(fast_socket: WebSocket):
 
             print("**********************************************************************")
             start_time = data["start"]
-            print(start_time)
 
             fb_data = {
                 "meeting_id": "uuid",
@@ -190,13 +178,6 @@ async def process_audio(fast_socket: WebSocket):
                         users_ref.child(f"{key}").update(updated_data)
             else:
                 users_ref.push(fb_data)
-
-            # fb = fire.FirebaseApplication(firebase_db_url, None)
-            # result = fb.get('/users', '1')
-            # print("fb result")
-            # print(result)
-            # # {'1': 'John Doe'}
-
             print("**********************************************************************")
 
             if transcript:
