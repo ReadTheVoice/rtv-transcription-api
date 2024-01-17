@@ -57,9 +57,7 @@ firebase_db_url = os.getenv('DATABASE_URL')
 credentials_file_path = os.getenv('CREDENTIALS_FILE_PATH')
 cred = credentials.Certificate(credentials_file_path)
 firebase_admin.initialize_app(cred, {'databaseURL': firebase_db_url})
-root_ref = db.reference()
-
-# token=...&meetingId=...
+root_reference = db.reference()
 
 # @app.on_event("startup")
 # async def startup_event():
@@ -85,6 +83,7 @@ def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+# @app.get("/verify_token", include_in_schema=False)
 @app.get("/verify_token")
 async def is_token_valid(token: str):
     try:
@@ -102,12 +101,8 @@ async def is_token_valid(token: str):
             )
 
         if response.status_code == 200:
-            print("response.json()")
             print(response.json())
-
             return response.json()
-            # return {"data": response.json()}
-            # return True
         else:
             raise HTTPException(status_code=response.status_code, detail="External URL request failed")
 
@@ -116,17 +111,17 @@ async def is_token_valid(token: str):
 
 
 @app.get("/transcribe", response_class=HTMLResponse)
-def get(request: Request):  # , user_id: str, meeting_id: str):
+def get(request: Request):
     return templates.TemplateResponse("transcription.html", {"request": request})
 
 
 # Websocket Connection Between Server and Browser
 @app.websocket("/listen")
-async def websocket_endpoint(websocket: WebSocket):  # Must pass the meetingId argument
+async def websocket_endpoint(websocket: WebSocket):  # meeting_id: str, user_id: str):
     await websocket.accept()
 
     try:
-        deepgram_socket = await process_audio(websocket)
+        deepgram_socket = await process_audio(websocket)  # meeting_id: str, user_id: str):
 
         while True:
             data = await websocket.receive_bytes()
@@ -137,47 +132,85 @@ async def websocket_endpoint(websocket: WebSocket):  # Must pass the meetingId a
         await websocket.close()
 
 
+# Save transcript to firebase
+def save_transcript(meeting_id, user_id, start_time, transcript):
+    fb_data = {
+        "meeting_id": meeting_id,
+        "user_id": user_id,
+        "start": start_time,
+        "data": transcript
+    }
+
+    transcript_reference = root_reference.child('transcript')
+    snapshot = transcript_reference.get()
+
+    if snapshot:
+        test = transcript_reference.order_by_child("meeting_id").equal_to(meeting_id).get()
+        if test:
+            # OrderedDict([('-NnjqZx3Tz52UXo5MJ1f', {'data': '', 'meeting_id': 'uuid', 'start': 0.0, 'user_id':
+            # 'uuid'})])
+            for key, values in test.items():
+                print(key)
+                print(values)
+                dt = values["data"]
+                st = values["start"]
+
+                if st != start_time:
+                    dt += ". "
+
+                dt += transcript
+                updated_data = {
+                    "start": start_time,
+                    'data': dt
+                }
+                transcript_reference.child(f"{key}").update(updated_data)
+    else:
+        transcript_reference.push(fb_data)
+
+
 # Process the audio, get the transcript from that audio and connect to Deepgram.
-async def process_audio(fast_socket: WebSocket):
+async def process_audio(fast_socket: WebSocket):  # meeting_id: str, user_id: str):  # Monster, APEC, HelloWork, choisirleservicepublic.gouv.fr
+    # token=...&meetingId=...
     async def get_transcript(data: Dict) -> None:
         if 'channel' in data:
             transcript = data['channel']['alternatives'][0]['transcript']
 
             print("**********************************************************************")
             start_time = data["start"]
+            save_transcript(meeting_id="uuid2", user_id="uuid2", start_time=start_time, transcript=transcript)
 
-            fb_data = {
-                "meeting_id": "uuid",
-                "user_id": "uuid",
-                "start": start_time,
-                "data": transcript
-            }
-
-            users_ref = root_ref.child('transcript')
-            snapshot = users_ref.get()
-
-            if snapshot:
-                test = users_ref.order_by_child("meeting_id").equal_to("uuid").get()
-                if test:
-                    ky = test
-                    # OrderedDict([('-NnjqZx3Tz52UXo5MJ1f', {'data': '', 'meeting_id': 'uuid', 'start': 0.0, 'user_id': 'uuid'})])
-                    for key, values in ky.items():
-                        print(key)
-                        print(values)
-                        dt = values["data"]
-                        st = values["start"]
-
-                        if st != start_time:
-                            dt += ". "
-
-                        dt += transcript
-                        updated_data = {
-                            'data': dt,
-                            "start": start_time
-                        }
-                        users_ref.child(f"{key}").update(updated_data)
-            else:
-                users_ref.push(fb_data)
+            # fb_data = {
+            #     "meeting_id": "uuid",
+            #     "user_id": "uuid",
+            #     "start": start_time,
+            #     "data": transcript
+            # }
+            #
+            # users_ref = root_ref.child('transcript')
+            # snapshot = users_ref.get()
+            #
+            # if snapshot:
+            #     test = users_ref.order_by_child("meeting_id").equal_to("uuid").get()
+            #     if test:
+            #         ky = test
+            #         # OrderedDict([('-NnjqZx3Tz52UXo5MJ1f', {'data': '', 'meeting_id': 'uuid', 'start': 0.0, 'user_id': 'uuid'})])
+            #         for key, values in ky.items():
+            #             print(key)
+            #             print(values)
+            #             dt = values["data"]
+            #             st = values["start"]
+            #
+            #             if st != start_time:
+            #                 dt += ". "
+            #
+            #             dt += transcript
+            #             updated_data = {
+            #                 'data': dt,
+            #                 "start": start_time
+            #             }
+            #             users_ref.child(f"{key}").update(updated_data)
+            # else:
+            #     users_ref.push(fb_data)
             print("**********************************************************************")
 
             if transcript:
@@ -191,7 +224,6 @@ async def process_audio(fast_socket: WebSocket):
 # Connect to Deepgram.
 async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None]):
     try:
-        # socket = await deepgram_client.transcription.live({'punctuate': True, 'interim_results': False})
         socket = await deepgram_client.transcription.live(deepgram_options)
 
         socket.registerHandler(socket.event.CLOSE, lambda c: print(f'Connection closed with code {c}.'))

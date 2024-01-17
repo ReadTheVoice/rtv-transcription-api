@@ -17,7 +17,7 @@
             const mediaRecorder = new MediaRecorder(stream)
 
             <!-- Websocket Connection Between Server and Browser-->
-            const socket = new WebSocket('ws://localhost:8000/listen')
+            const socket = new WebSocket('ws://localhost:8000/listen')  // With the params
 
             <!-- Receive and obtain data with the below events -->
             socket.onopen = () => {
