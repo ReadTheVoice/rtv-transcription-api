@@ -1,15 +1,15 @@
+import json
 import os
+from typing import Dict, Callable
+
+import firebase_admin
 import httpx
+from deepgram import Deepgram
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
-from deepgram import Deepgram
-from typing import Dict, Callable
-
-import firebase_admin
 from firebase_admin import credentials, db
-
 from starlette.middleware.cors import CORSMiddleware
 
 load_dotenv()
@@ -59,6 +59,7 @@ cred = credentials.Certificate(credentials_file_path)
 firebase_admin.initialize_app(cred, {'databaseURL': firebase_db_url})
 root_reference = db.reference()
 
+
 # @app.on_event("startup")
 # async def startup_event():
 
@@ -78,55 +79,71 @@ async def get_js_file():
     return FileResponse(js_file_path)
 
 
+@app.get("/css/error-page.css", include_in_schema=False)
+async def get_styles_file():
+    return FileResponse("project/src/app/templates/css/error-page.css")
+
+
+@app.get("/js/error-page.js", include_in_schema=False)
+async def get_js_file():
+    return FileResponse("project/src/app/templates/js/error-page.js")
+
+
 @app.get("/", response_class=HTMLResponse)
 def get(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    # return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("transcription.html", {"request": request})
 
 
-@app.get("/verify_token", include_in_schema=False)
-# @app.get("/verify_token")
-async def is_token_valid(token: str):
+# @app.get("/transcribe", response_class=HTMLResponse)
+# @app.get("/transcribe")
+# async def get(request: Request, meeting_id: str, token: str):
+@app.websocket("/transcribe")
+async def get(websocket: WebSocket, meeting_id: str, token: str):
+    error_message = "External URL request failed"
+    user_email = ""
+
     try:
+        # Verify token
         url = "https://verifytoken-vpiwklolaa-ey.a.run.app/"
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=url,
                 headers={
                     "Authorization": jwt_authorization,
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
                 },
-                json={
+                data={
                     "token": token
                 }
             )
 
+        data = response.json()
+
         if response.status_code == 200:
-            print(response.json())
-            # If error, user_not_found MAJ
-            # If error, token_verification_error MAJ
-            # { email, firstName, lastName }
+            if "error" in data:
+                return templates.TemplateResponse("error.html", {"error": data["error"], "meeting_id": meeting_id})
+            elif "email" in data:
+                user_email = data["email"]
+                user_firstname = data["firstName"]
+                user_lastname = data["lastName"]
+            else:
+                return templates.TemplateResponse("error.html", {"error": error_message})
 
-            # Check here what's in the response and then redirect to listen
-            return response.json()
+            return await websocket_endpoint(websocket=websocket, meeting_id=meeting_id, email_user=user_email)
         else:
-            raise HTTPException(status_code=response.status_code, detail="External URL request failed")
-
+            return templates.TemplateResponse("error.html", {"error": error_message})
     except httpx.RequestError as e:
-        raise HTTPException(status_code=500, detail=f"HTTP request error: {str(e)}")
-
-
-@app.get("/transcribe", response_class=HTMLResponse)
-def get(request: Request):
-    return templates.TemplateResponse("transcription.html", {"request": request})
+        return templates.TemplateResponse("error.html", {"error": str(e)})
 
 
 # Websocket Connection Between Server and Browser
 @app.websocket("/listen")
-async def websocket_endpoint(websocket: WebSocket):  # meeting_id: str, email_user: str):
+async def websocket_endpoint(websocket: WebSocket, meeting_id: str, email_user: str):
     await websocket.accept()
 
     try:
-        deepgram_socket = await process_audio(websocket)  # meeting_id: str, email_user: str):
+        deepgram_socket = await process_audio(websocket, meeting_id, email_user)
 
         while True:
             data = await websocket.receive_bytes()
@@ -169,20 +186,22 @@ def save_transcript(meeting_id, email_user, start_time, transcript):
                     'data': dt
                 }
                 transcript_reference.child(f"{key}").update(updated_data)
+        else:
+            transcript_reference.push(fb_data)
     else:
         transcript_reference.push(fb_data)
 
 
 # Process the audio, get the transcript from that audio and connect to Deepgram.
-async def process_audio(fast_socket: WebSocket):  # meeting_id: str, email_user: str):  # Monster, APEC, HelloWork, choisirleservicepublic.gouv.fr
-    # token=...&meetingId=...
+async def process_audio(fast_socket: WebSocket, meeting_id: str,
+                        email_user: str):  # Monster, APEC, HelloWork, choisirleservicepublic.gouv.fr
     async def get_transcript(data: Dict) -> None:
         if 'channel' in data:
             transcript = data['channel']['alternatives'][0]['transcript']
 
             print("**********************************************************************")
             start_time = data["start"]
-            save_transcript(meeting_id="uuid2", email_user="uuid2", start_time=start_time, transcript=transcript)
+            save_transcript(meeting_id=meeting_id, email_user=email_user, start_time=start_time, transcript=transcript)
             print("**********************************************************************")
 
             if transcript:
