@@ -1,0 +1,43 @@
+name: GitHub Actions - Check pull request reviewer/s
+run-name: ${{ github.actor }} edited or reopened a pull request 🚀
+on:
+  pull_request:
+    types:
+      - edited
+      - reopened
+#      - synchronize
+
+env:
+  PR: ${{ github.event.pull_request.html_url }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+jobs:
+  check-whether-a-pr-has-a-reviewer-or-not:
+    runs-on: ubuntu-latest
+
+    permissions:
+          issues: write
+          pull-requests: write
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - run: echo "🎉 Automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "PR#${{ env.PR_NUMBER }} will be merged into ${{ github.event.pull_request.base.label }}."
+
+      - name: "Prints the number of reviewers"
+        run: echo '${{ toJson(github.event.pull_request.requested_reviewers) }}' | jq '. | length'
+
+      - name: "A PR should be assigned to someone to review"
+        if: ${{ toJson(github.event.pull_request.requested_reviewers) == '[]' }}
+        run: |
+          gh pr edit $PR --add-label 'invalid'
+          gh pr comment $PR --body 'It looks like you have not assigned a reviewer to your pull request. It is not allowed to do so. Please review your PR.'
+          exit 1
+
+      - run: |
+          gh pr edit $PR --remove-label 'invalid'
+          gh pr edit $PR --add-label 'valid'
+          echo "🎉 Your pull request has at least a reviewer."
+          echo "🍏 This job's status is ${{ job.status }}."
