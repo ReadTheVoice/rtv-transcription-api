@@ -32,7 +32,7 @@ jobs:
           git fetch --depth=10000
           git checkout ${{ env.MAIN_BRANCH }}
           git pull
-          git merge ${{ env.DEVELOPMENT_BRANCH }} -m "Auto-merge ${{ env.DEVELOPMENT_BRANCH }} to ${{ env.MAIN_BRANCH }}"
+          git merge ${{ env.DEVELOPMENT_BRANCH }} --allow-unrelated-histories -m "Auto-merge ${{ env.DEVELOPMENT_BRANCH }} to ${{ env.MAIN_BRANCH }}"
           git push
 
       - run: echo "🍏 This job's status is ${{ job.status }}."
