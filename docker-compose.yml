@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  picshare_web:
+    build: ./project
+    command: uvicorn project.src.app.main:app --reload --workers 1 --host 0.0.0.0 --port 8000
+    volumes:
+      - ./project:/usr/src/project
+    ports:
+      - "8004:8000"
+    healthcheck:
+      test: curl --fail http://localhost:8000/docs || exit 1
+      interval: 10s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    environment:
+      ENVIRONMENT: dev
+      TESTING: 0
+      IMAGES_DIRECTORY_NAME: ${IMAGES_DIRECTORY_NAME}

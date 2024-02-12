@@ -41,7 +41,7 @@ favicon_path = 'project/src/app/static/img/favicon.ico'
 styles_file_path = 'project/src/app/templates/css/styles.css'
 js_file_path = 'project/src/app/templates/js/utils.js'
 
-# Feel free to modify your model's parameters as you wish!
+# Feel free to modify the model's parameters as you wish!
 # {'punctuate': True, 'interim_results': False, 'language': 'en-US', 'model': 'nova-2'}
 # Instead of "nova-2 "as model, we chose "enhanced" (which allowed us to stream in French)
 deepgram_options = {
@@ -96,7 +96,6 @@ def get(request: Request):
 
 
 # @app.get("/transcribe", response_class=HTMLResponse)
-# @app.get("/transcribe")
 # async def get(request: Request, meeting_id: str, token: str):
 @app.websocket("/transcribe")
 async def get(websocket: WebSocket, meeting_id: str, token: str):
@@ -194,7 +193,7 @@ def save_transcript(meeting_id, email_user, start_time, transcript):
 
 # Process the audio, get the transcript from that audio and connect to Deepgram.
 async def process_audio(fast_socket: WebSocket, meeting_id: str,
-                        email_user: str):  # Monster, APEC, HelloWork, choisirleservicepublic.gouv.fr
+                        email_user: str):
     async def get_transcript(data: Dict) -> None:
         if 'channel' in data:
             transcript = data['channel']['alternatives'][0]['transcript']

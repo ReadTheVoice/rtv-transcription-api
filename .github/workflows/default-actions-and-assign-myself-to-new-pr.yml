@@ -1,0 +1,46 @@
+name: GitHub Actions - Add myself as assignee & G as reviewer & a link to posts project to PR
+run-name: ${{ github.actor }} opened, edited or reopened a pull request 🚀
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - unassigned
+      - synchronize
+
+env:
+  PR: ${{ github.event.pull_request.html_url }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  PROJECT_NAME: "rtv-apis-project"
+  REVIEWER_NAME: "gaetanlhf"
+  MY_NAME: "SharonnElfride"
+
+jobs:
+  default-assignments-to-pr:
+    runs-on: ubuntu-latest
+
+    permissions:
+          issues: write
+          pull-requests: write
+          repository-projects: read
+          contents: read
+          actions: read
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      ORGANIZATION: "ReadTheVoice"
+
+    steps:
+      - run: echo "🎉 Automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "PR#${{ env.PR_NUMBER }} will be merged into ${{ github.event.pull_request.base.label }}."
+      - name: "Assign myself"
+        run: |
+          gh pr edit $PR --add-assignee ${{ env.MY_NAME }}
+      - name: "Assign G"
+        run: |
+          gh pr edit $PR --add-reviewer ${{ env.REVIEWER_NAME }}
+      - name: "Add project"
+        run: |
+          gh pr edit $PR --add-project ${{ env.PROJECT_NAME }}
+      - run: echo "🍏 This job's status is ${{ job.status }}!"

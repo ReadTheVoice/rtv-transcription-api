@@ -1,6 +1,6 @@
 async function callApi() {
     try {
-        let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxbDJXZ01jaTRzWlFQUmk2a0FXTllZU2x4cUgzIiwiaWF0IjoxNzA3MTYyNDA4LCJleHAiOjE3Mzg2OTg0MDh9.v15GrQ3bgsuCqiZorDETzTclse_kG7_s9afO7MG6gg0"
+        let token = ""
         let meeting_id = generateUUID();
         let url = `ws://localhost:8000/transcribe?meeting_id=${meeting_id}&token=${token}`
         let sock = new WebSocket(url)
