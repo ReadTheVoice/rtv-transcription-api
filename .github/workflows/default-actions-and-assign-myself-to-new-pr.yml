@@ -28,23 +28,20 @@ jobs:
           actions: read
 
     env:
-      GITHUB_TOKEN: ${{ secrets.POSTS_ACTIONS_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      GITHUB_TOKEN: ${{ secrets.POSTS_ACTIONS_TOKEN }}
       ORGANIZATION: "ReadTheVoice"
 
     steps:
       - run: echo "🎉 Automatically triggered by a ${{ github.event_name }} event."
       - run: echo "PR#${{ env.PR_NUMBER }} will be merged into ${{ github.event.pull_request.base.label }}."
-
       - name: "Assign myself"
         run: |
           gh pr edit $PR --add-assignee ${{ env.MY_NAME }}
-
       - name: "Assign G"
         run: |
           gh pr edit $PR --add-reviewer ${{ env.REVIEWER_NAME }}
-
       - name: "Add project"
         run: |
           gh pr edit $PR --add-project ${{ env.PROJECT_NAME }}
-
       - run: echo "🍏 This job's status is ${{ job.status }}!"
