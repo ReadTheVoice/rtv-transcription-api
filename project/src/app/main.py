@@ -96,7 +96,6 @@ def get(request: Request):
 
 
 # @app.get("/transcribe", response_class=HTMLResponse)
-# @app.get("/transcribe")
 # async def get(request: Request, meeting_id: str, token: str):
 @app.websocket("/transcribe")
 async def get(websocket: WebSocket, meeting_id: str, token: str):
