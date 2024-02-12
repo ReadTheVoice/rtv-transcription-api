@@ -1,0 +1,41 @@
+name: GitHub Actions - Merge modifications made on develop to main branch
+run-name: ${{ github.actor }} has updated develop so automatically merging develop to main branch 🚀
+
+env:
+  MAIN_BRANCH: main
+  DEVELOPMENT_BRANCH: develop
+  V1_BRANCH: v1
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - develop
+
+jobs:
+  merge_develop_to_tests_and_main:
+    if: github.event.pull_request.merged == true
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "🎉 Automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🔎 The branch name is ${{ github.ref }} and the repository is ${{ github.repository }}."
+      - uses: actions/checkout@v3
+      - name: Set Git config
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Actions"
+
+      - name: Merge ${{ env.DEVELOPMENT_BRANCH }} to main branch => ${{ env.MAIN_BRANCH }}
+        run: |
+          git fetch --depth=10000
+          git checkout ${{ env.MAIN_BRANCH }}
+          git pull
+          git merge ${{ env.DEVELOPMENT_BRANCH }} --allow-unrelated-histories -m "Auto-merge ${{ env.DEVELOPMENT_BRANCH }} to ${{ env.MAIN_BRANCH }}"
+          git push
+
+      - run: echo "🍏 This job's status is ${{ job.status }}."

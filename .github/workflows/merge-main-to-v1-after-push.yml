@@ -1,0 +1,32 @@
+name: GitHub Actions - Merge modifications made on main to v1 branch
+run-name: ${{ github.actor }} has updated develop so automatically merging main to v1 branch 🚀
+
+env:
+  MAIN_BRANCH: main
+  V1_BRANCH: v1
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  merge_main_to_v1:
+    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "🎉 Automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🔎 The branch name is ${{ github.ref }} and the repository is ${{ github.repository }}."
+      - uses: actions/checkout@v3
+      - name: Set Git config
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Actions"
+      - name: Merge ${{ env.MAIN_BRANCH }} to v1 branch => ${{ env.V1_BRANCH }}
+        run: |
+          git fetch --depth=10000
+          git checkout ${{ env.V1_BRANCH }}
+          git pull
+          git merge ${{ env.MAIN_BRANCH }} --allow-unrelated-histories -m "Auto-merge ${{ env.MAIN_BRANCH }} to ${{ env.V1_BRANCH }}"
+          git push
+      - run: echo "🍏 This job's status is ${{ job.status }}."

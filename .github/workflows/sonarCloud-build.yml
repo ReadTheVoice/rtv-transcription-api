@@ -1,0 +1,52 @@
+name: SonarCloud Build 🚀
+on:
+  push:
+    branches:
+      - main
+      - v1
+      - sonarcloud-integration
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Setup Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r project/requirements.txt
+
+      - name: Run app
+        run: |
+          docker-compose rm
+          docker-compose config
+          docker-compose up -d --build
+        env:
+          IMAGES_DIRECTORY_NAME: project/src/upload/img
+
+      - name: Test with pytest
+        run: |
+          pip install pytest pytest-cov pytest-html pytest-sugar pytest-json-report
+          pytest -v --cov-report xml:project/tests/reports/pytest/coverage-main.xml --cov=project.src.app.main project/tests/main.py
+
+      - name: Archive pytest coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: project/tests/reports/pytest/
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Needed to run sonar analysis
