@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from firebase_admin import credentials, db
 from starlette.middleware.cors import CORSMiddleware
+import copy
 
 load_dotenv()
 
@@ -43,13 +44,13 @@ js_file_path = 'project/src/app/templates/js/utils.js'
 
 # Feel free to modify the model's parameters as you wish!
 # {'punctuate': True, 'interim_results': False, 'language': 'en-US', 'model': 'nova-2'}
-# Instead of "nova-2 "as model, we chose "enhanced" (which allowed us to stream in French)
+# We chose "nova-2"
 deepgram_options = {
     'punctuate': True,
-    # 'interim_results': True,
-    'interim_results': False,
-    'language': 'fr',
-    'model': 'enhanced',
+    # 'interim_results': False,
+    'interim_results': True,
+    # 'model': 'enhanced',
+    'model': 'nova-2',
 }
 
 # Database config
@@ -152,59 +153,77 @@ async def websocket_endpoint(websocket: WebSocket, meeting_id: str, email_user: 
     finally:
         await websocket.close()
 
-
-# Save transcript to firebase
-def save_transcript(meeting_id, email_user, start_time, transcript):
-    fb_data = {
-        "meeting_id": meeting_id,
-        "email_user": email_user,
-        "start": start_time,
-        "data": transcript
-    }
-
-    transcript_reference = root_reference.child('transcript')
-    snapshot = transcript_reference.get()
-
-    if snapshot:
-        test = transcript_reference.order_by_child("meeting_id").equal_to(meeting_id).get()
-        if test:
-            # OrderedDict([('-NnjqZx3Tz52UXo5MJ1f', {'data': '', 'meeting_id': 'uuid', 'start': 0.0, 'email_user':
-            # 'uuid'})])
-            for key, values in test.items():
-                print(key)
-                print(values)
-                dt = values["data"]
-                st = values["start"]
-
-                if st != start_time:
-                    dt += ". "
-
-                dt += transcript
-                updated_data = {
-                    "start": start_time,
-                    'data': dt
-                }
-                transcript_reference.child(f"{key}").update(updated_data)
-        else:
-            transcript_reference.push(fb_data)
-    else:
-        transcript_reference.push(fb_data)
-
-
 # Process the audio, get the transcript from that audio and connect to Deepgram.
 async def process_audio(fast_socket: WebSocket, meeting_id: str,
                         email_user: str):
+    
+    saveData = "none"
+
     async def get_transcript(data: Dict) -> None:
+        nonlocal saveData
         if 'channel' in data:
             transcript = data['channel']['alternatives'][0]['transcript']
 
-            print("**********************************************************************")
-            start_time = data["start"]
-            save_transcript(meeting_id=meeting_id, email_user=email_user, start_time=start_time, transcript=transcript)
-            print("**********************************************************************")
+            isFinal = data['is_final'] 
 
-            if transcript:
-                await fast_socket.send_text(transcript)
+            if transcript == "" or transcript == " ":
+                return
+
+            transcript_reference = root_reference.child('transcripts').child(meeting_id)
+            snapshot = transcript_reference.get()
+            if isFinal:
+                if saveData == "none":
+                    dt = snapshot.get("data", "")
+                else:
+                    dt = copy.deepcopy(saveData)
+                wsTranscript = ""
+
+                if transcript[0].isupper() and dt.endswith(','):
+                    transcript = transcript[0].lower() + transcript[1:]
+
+                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", ""]:
+                    dt += ". "
+                    wsTranscript += ". "
+                elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
+                    dt += " "
+                    wsTranscript += " "
+
+                
+                dt += transcript
+                updated_data = {
+                    'data': dt
+                }
+                transcript_reference.update(updated_data)
+                wsTranscript += transcript
+                print("final")
+                print(updated_data)
+                if transcript:
+                    await fast_socket.send_text(wsTranscript)
+                
+                saveData = "none"
+            else:
+                if saveData == "none":
+                    saveData = snapshot.get("data", "")
+                print("saveData")
+                print(saveData)
+                dt = copy.deepcopy(saveData)
+
+                if transcript[0].isupper() and (not dt.endswith(',')):
+                    transcript = transcript[0].lower() + transcript[1:]
+
+                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", ""]:
+                    dt += ". "
+                elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
+                    dt += " "
+
+                dt += transcript
+                updated_data = {
+                    'data': dt
+                }
+                print("nofinal")
+                print(updated_data)
+                transcript_reference.update(updated_data)
+
 
     deepgram_socket = await connect_to_deepgram(get_transcript)
 
@@ -214,6 +233,7 @@ async def process_audio(fast_socket: WebSocket, meeting_id: str,
 # Connect to Deepgram.
 async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None]):
     try:
+        deepgram_options['language'] = "fr"
         socket = await deepgram_client.transcription.live(deepgram_options)
 
         socket.registerHandler(socket.event.CLOSE, lambda c: print(f'Connection closed with code {c}.'))
