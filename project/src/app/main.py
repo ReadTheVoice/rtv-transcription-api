@@ -99,7 +99,7 @@ def get(request: Request):
 # @app.get("/transcribe", response_class=HTMLResponse)
 # async def get(request: Request, meeting_id: str, token: str):
 @app.websocket("/transcribe")
-async def get(websocket: WebSocket, meeting_id: str, token: str):
+async def get(websocket: WebSocket, meeting_id: str, language: str, token: str):
     error_message = "External URL request failed"
     user_email = ""
 
@@ -130,7 +130,7 @@ async def get(websocket: WebSocket, meeting_id: str, token: str):
             else:
                 return templates.TemplateResponse("error.html", {"error": error_message})
 
-            return await websocket_endpoint(websocket=websocket, meeting_id=meeting_id, email_user=user_email)
+            return await websocket_endpoint(websocket=websocket, meeting_id=meeting_id, language=language, email_user=user_email)
         else:
             return templates.TemplateResponse("error.html", {"error": error_message})
     except httpx.RequestError as e:
@@ -139,22 +139,25 @@ async def get(websocket: WebSocket, meeting_id: str, token: str):
 
 # Websocket Connection Between Server and Browser
 @app.websocket("/listen")
-async def websocket_endpoint(websocket: WebSocket, meeting_id: str, email_user: str):
+async def websocket_endpoint(websocket: WebSocket, meeting_id: str, language: str, email_user: str):
     await websocket.accept()
 
     try:
-        deepgram_socket = await process_audio(websocket, meeting_id, email_user)
+        deepgram_socket = await process_audio(websocket, meeting_id, language, email_user)
 
         while True:
-            data = await websocket.receive_bytes()
-            deepgram_socket.send(data)
+            try:
+                data = await websocket.receive_bytes()
+                deepgram_socket.send(data)
+            except starlette.websockets.WebSocketDisconnect:
+                print("Client disconnected")
     except Exception as e:
         raise Exception(f'Could not process audio: {e}')
     finally:
         await websocket.close()
 
 # Process the audio, get the transcript from that audio and connect to Deepgram.
-async def process_audio(fast_socket: WebSocket, meeting_id: str,
+async def process_audio(fast_socket: WebSocket, meeting_id: str, language: str,
                         email_user: str):
     
     saveData = "none"
@@ -172,21 +175,21 @@ async def process_audio(fast_socket: WebSocket, meeting_id: str,
             transcript_reference = root_reference.child('transcripts').child(meeting_id)
             snapshot = transcript_reference.get()
             if isFinal:
-                if saveData == "none":
-                    dt = snapshot.get("data", "")
+                if snapshot:
+                    if saveData == "none":
+                        dt = snapshot.get("data", "")
+                    else:
+                        dt = copy.deepcopy(saveData)
                 else:
-                    dt = copy.deepcopy(saveData)
-                wsTranscript = ""
+                    dt = ""
 
                 if transcript[0].isupper() and dt.endswith(','):
                     transcript = transcript[0].lower() + transcript[1:]
 
-                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", ""]:
+                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", "",",", "?", "!", ":", ";"]:
                     dt += ". "
-                    wsTranscript += ". "
                 elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
                     dt += " "
-                    wsTranscript += " "
 
                 
                 dt += transcript
@@ -194,24 +197,22 @@ async def process_audio(fast_socket: WebSocket, meeting_id: str,
                     'data': dt
                 }
                 transcript_reference.update(updated_data)
-                wsTranscript += transcript
-                print("final")
-                print(updated_data)
                 if transcript:
-                    await fast_socket.send_text(wsTranscript)
+                    await fast_socket.send_text(dt)
                 
                 saveData = "none"
             else:
-                if saveData == "none":
-                    saveData = snapshot.get("data", "")
-                print("saveData")
-                print(saveData)
-                dt = copy.deepcopy(saveData)
+                if snapshot:
+                    if saveData == "none":
+                        saveData = snapshot.get("data", "")
+                    dt = copy.deepcopy(saveData)
+                else:
+                    dt = ""
 
                 if transcript[0].isupper() and (not dt.endswith(',')):
                     transcript = transcript[0].lower() + transcript[1:]
 
-                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", ""]:
+                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", "",",", "?", "!", ":", ";"]:
                     dt += ". "
                 elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
                     dt += " "
@@ -220,20 +221,20 @@ async def process_audio(fast_socket: WebSocket, meeting_id: str,
                 updated_data = {
                     'data': dt
                 }
-                print("nofinal")
-                print(updated_data)
                 transcript_reference.update(updated_data)
+                if transcript:
+                    await fast_socket.send_text(dt)
 
 
-    deepgram_socket = await connect_to_deepgram(get_transcript)
+    deepgram_socket = await connect_to_deepgram(get_transcript, language)
 
     return deepgram_socket
 
 
 # Connect to Deepgram.
-async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None]):
+async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None], language: str):
     try:
-        deepgram_options['language'] = "fr"
+        deepgram_options['language'] = language
         socket = await deepgram_client.transcription.live(deepgram_options)
 
         socket.registerHandler(socket.event.CLOSE, lambda c: print(f'Connection closed with code {c}.'))
