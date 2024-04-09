@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
-from firebase_admin import credentials, db
+from firebase_admin import initialize_app, db
 from starlette.middleware.cors import CORSMiddleware
 import copy
 
@@ -55,9 +55,7 @@ deepgram_options = {
 
 # Database config
 firebase_db_url = os.getenv('DATABASE_URL')
-credentials_file_path = os.getenv('CREDENTIALS_FILE_PATH')
-cred = credentials.Certificate(credentials_file_path)
-firebase_admin.initialize_app(cred, {'databaseURL': firebase_db_url})
+initialize_app(options={'databaseURL': firebase_db_url})
 root_reference = db.reference()
 
 
@@ -90,10 +88,10 @@ async def get_js_file():
     return FileResponse("project/src/app/templates/js/error-page.js")
 
 
-@app.get("/", response_class=HTMLResponse)
-def get(request: Request):
-    # return templates.TemplateResponse("index.html", {"request": request})
-    return templates.TemplateResponse("transcription.html", {"request": request})
+# @app.get("/", response_class=HTMLResponse)
+# def get(request: Request):
+#     # return templates.TemplateResponse("index.html", {"request": request})
+#     return templates.TemplateResponse("transcription.html", {"request": request})
 
 
 # @app.get("/transcribe", response_class=HTMLResponse)
@@ -138,7 +136,6 @@ async def get(websocket: WebSocket, meeting_id: str, language: str, token: str):
 
 
 # Websocket Connection Between Server and Browser
-@app.websocket("/listen")
 async def websocket_endpoint(websocket: WebSocket, meeting_id: str, language: str, email_user: str):
     await websocket.accept()
 
