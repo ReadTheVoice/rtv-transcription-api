@@ -179,25 +179,6 @@ async def process_audio(fast_socket: WebSocket, meeting_id: str, language: str,
                         dt = copy.deepcopy(saveData)
                 else:
                     dt = ""
-
-                if transcript[0].isupper() and dt.endswith(','):
-                    transcript = transcript[0].lower() + transcript[1:]
-
-                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", "",",", "?", "!", ":", ";"]:
-                    dt += ". "
-                elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
-                    dt += " "
-
-                
-                dt += transcript
-                updated_data = {
-                    'data': dt
-                }
-                transcript_reference.update(updated_data)
-                if transcript:
-                    await fast_socket.send_text(dt)
-                
-                saveData = "none"
             else:
                 if snapshot:
                     if saveData == "none":
@@ -206,21 +187,26 @@ async def process_audio(fast_socket: WebSocket, meeting_id: str, language: str,
                 else:
                     dt = ""
 
-                if transcript[0].isupper() and (not dt.endswith(',')):
-                    transcript = transcript[0].lower() + transcript[1:]
+            if transcript[0].isupper() and dt.endswith(','):
+                transcript = transcript[0].lower() + transcript[1:]
 
-                if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", "",",", "?", "!", ":", ";"]:
-                    dt += ". "
-                elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
-                    dt += " "
+            if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", "",",", "?", "!", ":", ";"]:
+                dt += ". "
+            elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
+                dt += " "
 
-                dt += transcript
-                updated_data = {
-                    'data': dt
-                }
-                transcript_reference.update(updated_data)
-                if transcript:
-                    await fast_socket.send_text(dt)
+            
+            dt += transcript
+            updated_data = {
+                'data': dt
+            }
+            transcript_reference.update(updated_data)
+            if transcript:
+                await fast_socket.send_text(dt)
+            
+            if isFinal:
+                saveData = "none"
+           
 
 
     deepgram_socket = await connect_to_deepgram(get_transcript, language)
