@@ -17,4 +17,4 @@ RUN pip install --upgrade pip
 RUN pip install -r project/requirements.txt
 
 EXPOSE 8080
-CMD ["uvicorn", "project.src.app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "-m", "uvicorn", "project.src.app.main:app", "--host", "0.0.0.0", "--port", "8080"]
