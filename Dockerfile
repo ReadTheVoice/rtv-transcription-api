@@ -1,7 +1,12 @@
 FROM python:3.11-alpine
 
+RUN adduser -D rtv
+
 RUN mkdir -p /opt/app/project
 WORKDIR /opt/app/
+RUN chown -R rtv:rtv /opt/app
+
+USER rtv
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
