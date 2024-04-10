@@ -9,8 +9,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
-from firebase_admin import credentials, db
+from firebase_admin import initialize_app, db
 from starlette.middleware.cors import CORSMiddleware
+import copy
 
 load_dotenv()
 
@@ -43,20 +44,18 @@ js_file_path = 'project/src/app/templates/js/utils.js'
 
 # Feel free to modify the model's parameters as you wish!
 # {'punctuate': True, 'interim_results': False, 'language': 'en-US', 'model': 'nova-2'}
-# Instead of "nova-2 "as model, we chose "enhanced" (which allowed us to stream in French)
+# We chose "nova-2"
 deepgram_options = {
     'punctuate': True,
-    # 'interim_results': True,
-    'interim_results': False,
-    'language': 'fr',
-    'model': 'enhanced',
+    # 'interim_results': False,
+    'interim_results': True,
+    # 'model': 'enhanced',
+    'model': 'nova-2',
 }
 
 # Database config
 firebase_db_url = os.getenv('DATABASE_URL')
-credentials_file_path = os.getenv('CREDENTIALS_FILE_PATH')
-cred = credentials.Certificate(credentials_file_path)
-firebase_admin.initialize_app(cred, {'databaseURL': firebase_db_url})
+initialize_app(options={'databaseURL': firebase_db_url})
 root_reference = db.reference()
 
 
@@ -89,16 +88,16 @@ async def get_js_file():
     return FileResponse("project/src/app/templates/js/error-page.js")
 
 
-@app.get("/", response_class=HTMLResponse)
-def get(request: Request):
-    # return templates.TemplateResponse("index.html", {"request": request})
-    return templates.TemplateResponse("transcription.html", {"request": request})
+# @app.get("/", response_class=HTMLResponse)
+# def get(request: Request):
+#     # return templates.TemplateResponse("index.html", {"request": request})
+#     return templates.TemplateResponse("transcription.html", {"request": request})
 
 
 # @app.get("/transcribe", response_class=HTMLResponse)
 # async def get(request: Request, meeting_id: str, token: str):
 @app.websocket("/transcribe")
-async def get(websocket: WebSocket, meeting_id: str, token: str):
+async def get(websocket: WebSocket, meeting_id: str, language: str, token: str):
     error_message = "External URL request failed"
     user_email = ""
 
@@ -129,7 +128,7 @@ async def get(websocket: WebSocket, meeting_id: str, token: str):
             else:
                 return templates.TemplateResponse("error.html", {"error": error_message})
 
-            return await websocket_endpoint(websocket=websocket, meeting_id=meeting_id, email_user=user_email)
+            return await websocket_endpoint(websocket=websocket, meeting_id=meeting_id, language=language, email_user=user_email)
         else:
             return templates.TemplateResponse("error.html", {"error": error_message})
     except httpx.RequestError as e:
@@ -137,83 +136,88 @@ async def get(websocket: WebSocket, meeting_id: str, token: str):
 
 
 # Websocket Connection Between Server and Browser
-@app.websocket("/listen")
-async def websocket_endpoint(websocket: WebSocket, meeting_id: str, email_user: str):
+async def websocket_endpoint(websocket: WebSocket, meeting_id: str, language: str, email_user: str):
     await websocket.accept()
 
     try:
-        deepgram_socket = await process_audio(websocket, meeting_id, email_user)
+        deepgram_socket = await process_audio(websocket, meeting_id, language, email_user)
 
         while True:
-            data = await websocket.receive_bytes()
-            deepgram_socket.send(data)
+            try:
+                data = await websocket.receive_bytes()
+                deepgram_socket.send(data)
+            except starlette.websockets.WebSocketDisconnect:
+                print("Client disconnected")
     except Exception as e:
         raise Exception(f'Could not process audio: {e}')
     finally:
         await websocket.close()
 
-
-# Save transcript to firebase
-def save_transcript(meeting_id, email_user, start_time, transcript):
-    fb_data = {
-        "meeting_id": meeting_id,
-        "email_user": email_user,
-        "start": start_time,
-        "data": transcript
-    }
-
-    transcript_reference = root_reference.child('transcript')
-    snapshot = transcript_reference.get()
-
-    if snapshot:
-        test = transcript_reference.order_by_child("meeting_id").equal_to(meeting_id).get()
-        if test:
-            # OrderedDict([('-NnjqZx3Tz52UXo5MJ1f', {'data': '', 'meeting_id': 'uuid', 'start': 0.0, 'email_user':
-            # 'uuid'})])
-            for key, values in test.items():
-                print(key)
-                print(values)
-                dt = values["data"]
-                st = values["start"]
-
-                if st != start_time:
-                    dt += ". "
-
-                dt += transcript
-                updated_data = {
-                    "start": start_time,
-                    'data': dt
-                }
-                transcript_reference.child(f"{key}").update(updated_data)
-        else:
-            transcript_reference.push(fb_data)
-    else:
-        transcript_reference.push(fb_data)
-
-
 # Process the audio, get the transcript from that audio and connect to Deepgram.
-async def process_audio(fast_socket: WebSocket, meeting_id: str,
+async def process_audio(fast_socket: WebSocket, meeting_id: str, language: str,
                         email_user: str):
+    
+    saveData = "none"
+
     async def get_transcript(data: Dict) -> None:
+        nonlocal saveData
         if 'channel' in data:
             transcript = data['channel']['alternatives'][0]['transcript']
 
-            print("**********************************************************************")
-            start_time = data["start"]
-            save_transcript(meeting_id=meeting_id, email_user=email_user, start_time=start_time, transcript=transcript)
-            print("**********************************************************************")
+            isFinal = data['is_final'] 
 
+            if transcript == "" or transcript == " ":
+                return
+
+            transcript_reference = root_reference.child('transcripts').child(meeting_id)
+            snapshot = transcript_reference.get()
+            if isFinal:
+                if snapshot:
+                    if saveData == "none":
+                        dt = snapshot.get("data", "")
+                    else:
+                        dt = copy.deepcopy(saveData)
+                else:
+                    dt = ""
+            else:
+                if snapshot:
+                    if saveData == "none":
+                        saveData = snapshot.get("data", "")
+                    dt = copy.deepcopy(saveData)
+                else:
+                    dt = ""
+
+            if transcript[0].isupper() and dt.endswith(','):
+                transcript = transcript[0].lower() + transcript[1:]
+
+            if transcript and transcript[0].isupper() and dt and dt[-1] not in [".", "",",", "?", "!", ":", ";"]:
+                dt += ". "
+            elif dt and dt[-1] not in [" ", ". ", ", ", "? ", "! ", ": ", "; ", ") ", "] "]:
+                dt += " "
+
+            
+            dt += transcript
+            updated_data = {
+                'data': dt
+            }
+            transcript_reference.update(updated_data)
             if transcript:
-                await fast_socket.send_text(transcript)
+                await fast_socket.send_text(dt)
+            
+            if isFinal:
+                saveData = "none"
+           
 
-    deepgram_socket = await connect_to_deepgram(get_transcript)
+
+    deepgram_socket = await connect_to_deepgram(get_transcript, language)
 
     return deepgram_socket
 
 
 # Connect to Deepgram.
-async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None]):
+async def connect_to_deepgram(transcript_received_handler: Callable[[Dict], None], language: str):
     try:
+        deepgram_options['language'] = language
         socket = await deepgram_client.transcription.live(deepgram_options)
 
         socket.registerHandler(socket.event.CLOSE, lambda c: print(f'Connection closed with code {c}.'))
